@@ -1,0 +1,107 @@
+# Ethereum Blockchain Feature Extraction Pipeline
+
+A scalable, automated system for extracting Ethereum blockchain features using multiple Google Cloud Platform VMs in parallel.
+
+## Overview
+
+This pipeline automatically:
+1. **Creates multiple GCP VMs**
+2. **Splits dates**
+3. **Runs extraction**
+4. **Monitors progress**
+5. **Collects and aggregates**
+6. **Cleans up cloud**
+
+## Quick Start
+
+### 1. Prerequisites
+
+- **Google Cloud SDK** installed and authenticated with gcould
+- **Python 3.12+** with pip
+- **GCP Project** with Compute Engine API enabled on console
+<!-- - **Ethereum API keys** (Alchemy, Infura, etc.) -->
+
+### 2. Setup
+
+```bash
+# Clone this repository
+git clone <your-repo-url>
+cd ethereum-extraction-pipeline
+
+# Run setup script
+chmod +x setup.sh
+./setup.sh
+```
+
+### 3. Env Config
+
+Update .env file for gcp credentials, and required dates.
+
+### 4. Run Pipeline
+
+```bash
+python3 main.py
+```
+
+## Configuration Reference
+
+### Required Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `GCP_PROJECT_ID` | Your Google Cloud project ID
+| `START_DATE` | Start date (YYYY-MM-DD-HH:MM)
+| `END_DATE` | End date (YYYY-MM-DD-HH:MM)
+| `NUM_VMS` | Number of parallel VMs
+| `ETHEREUM_PROVIDER_URLS` | API URLs (comma-separated) | `https://eth-mainnet.alchemyapi.io/v2/key` |
+
+### Optional Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `GCP_ZONE` | `us-central1-a` | GCP zone for VMs |
+| `GCP_MACHINE_TYPE` | `e2-standard-2` | VM machine type |
+| `GCP_BOOT_DISK_SIZE` | `20GB` | Boot disk size |
+| `INTERVAL_SPAN_TYPE` | `day` | Interval type (day/week/month) |
+| `INTERVAL_SPAN_LENGTH` | `1.0` | Interval length |
+| `OBSERVATIONS_PER_INTERVAL` | `100` | Top transactions per interval |
+| `DELAY_SECONDS` | `0.05` | Delay between API calls |
+| `MONITOR_CHECK_INTERVAL` | `300` | VM status check interval (seconds) |
+| `LOCAL_DATA_DIR` | `collected_data` | Local directory for collected data |
+
+## File architecture
+
+```
+ethereum-extraction-pipeline/
+├── main.py                      # Main execution script
+├── gcp_eth_orchestrator.py      # Core orchestration logic
+├── requirements.txt             # Python dependencies
+├── setup.sh                     # Environment setup script
+├── .env.template               # Configuration template
+├── .env                        # Your configuration (created by setup)
+├── collected_data/             # Downloaded VM data
+│   ├── eth-extractor-001/      # Data from VM 1
+│   ├── eth-extractor-002/      # Data from VM 2
+│   └── aggregated/             # Final combined datasets
+└── README.md                   # This documentation
+```
+
+
+## Parameter Considerations
+1. **VM size**: Uses `e2-standard-2` size VMs, specify whatever location is cheapest. This balances the number of cores needed with the networking speed, and provides the best fit for this task.
+2. **VM count**: More VMs means faster process. One VM can do a day in ~20 mins, or a month in ~ 10 hours.
+
+## Monitoring views
+```bash
+# List running VMs
+gcloud compute instances list --filter="name~eth-extractor"
+
+# SSH into a specific VM
+gcloud compute ssh eth-extractor-001 --zone=us-central1-a
+
+# Check extraction progress
+gcloud compute ssh eth-extractor-001 --command="screen -ls"
+
+# View extraction logs
+gcloud compute ssh eth-extractor-001 --command="tail -f /var/log/startup-script.log"
+```
