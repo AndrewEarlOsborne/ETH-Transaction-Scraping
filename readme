@@ -1,6 +1,6 @@
 # Ethereum Blockchain Feature Extraction Pipeline
 
-A scalable, automated system for extracting Ethereum blockchain features using multiple Google Cloud Platform VMs in parallel.
+A scalable, automated system for extracting Ethereum blockchain features using multiple Google Cloud Platform VMs in parallel. Requires a GCloud Org and authorization. Handles VM scheduling and cleanup upon completion, without needed dedicated connection
 
 ## Overview
 
