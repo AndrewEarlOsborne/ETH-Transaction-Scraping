@@ -65,7 +65,7 @@ python3 main.py
 | `INTERVAL_SPAN_TYPE` | `day` | Interval type (day/week/month) |
 | `INTERVAL_SPAN_LENGTH` | `1.0` | Interval length |
 | `OBSERVATIONS_PER_INTERVAL` | `100` | Top transactions per interval |
-| `DELAY_SECONDS` | `0.05` | Delay between API calls |
+| `PROVIDER_FETCH_DELAY_SECONDS` | `0.05` | Delay between API calls |
 | `MONITOR_CHECK_INTERVAL` | `300` | VM status check interval (seconds) |
 | `LOCAL_DATA_DIR` | `collected_data` | Local directory for collected data |
 

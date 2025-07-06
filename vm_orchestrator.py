@@ -33,6 +33,7 @@ class EthereumVMOrchestrator:
             handlers=[logging.FileHandler("pipeline_errors.log")]
         )
         self.logger = logging.getLogger(__name__)
+        self.logger.info("Ethereum VM Orchestrator initialized")
         
     def _load_config(self, config_file: str):
         """Load and validate configuration."""
@@ -70,7 +71,7 @@ class EthereumVMOrchestrator:
             'interval_type': os.getenv('INTERVAL_SPAN_TYPE', 'day'),
             'interval_length': os.getenv('INTERVAL_SPAN_LENGTH', '1.0'),
             'observations': os.getenv('OBSERVATIONS_PER_INTERVAL', '100'),
-            'delay': os.getenv('DELAY_SECONDS', '0.05')
+            'delay': os.getenv('PROVIDER_FETCH_DELAY_SECONDS', '0.05')
         }
         
     def _get_vm_names(self) -> List[str]:
@@ -95,15 +96,6 @@ class EthereumVMOrchestrator:
         """Generate startup script for VM."""
         vm_start, vm_end = self._get_vm_time_range(vm_index)
         provider_url = self.provider_urls[vm_index % len(self.provider_urls)]
-        
-        dot_env_vars = f"""ETHEREUM_PROVIDER_URL={provider_url}
-    START_DATE={vm_start}
-    END_DATE={vm_end}
-    OBSERVATIONS_PER_INTERVAL={self.vm_config['observations']}
-    DELAY_SECONDS={self.vm_config['delay']}
-    INTERVAL_SPAN_TYPE={self.vm_config['interval_type']}
-    INTERVAL_SPAN_LENGTH={self.vm_config['interval_length']}
-    DATA_DIRECTORY=data"""
 
         return f'''#!/bin/bash
         set -e
@@ -122,7 +114,14 @@ class EthereumVMOrchestrator:
         pip install -q -r requirements.txt
 
         cat > .env << EOF
-        {dot_env_vars}
+        ETHEREUM_PROVIDER_URL={provider_url}
+        START_DATE={vm_start}
+        END_DATE={vm_end}
+        OBSERVATIONS_PER_INTERVAL={self.vm_config['observations']}
+        PROVIDER_FETCH_DELAY_SECONDS={self.vm_config['delay']}
+        INTERVAL_SPAN_TYPE={self.vm_config['interval_type']}
+        INTERVAL_SPAN_LENGTH={self.vm_config['interval_length']}
+        DATA_DIRECTORY=data
         EOF
 
         screen -dmS extraction bash -c "cd /home/ethereum/extraction_pipeline && source venv/bin/activate && python main.py"
