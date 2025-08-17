@@ -17,6 +17,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from dotenv import load_dotenv
+from tqdm import tqdm
 
 
 class EthereumExtractor:
@@ -258,33 +259,37 @@ class EthereumExtractor:
         transactions = []
         validators = []
         
-        for i, block_num in enumerate(block_numbers):
-            try:
-                block = self._get_block_by_number(block_num, True)
-                if not block:
-                    self.logger.warning(f"Could not fetch block {block_num}")
-                    continue
-                    
-                # Extract block/validator features
-                block_features = self._extract_block_features(block)
-                validators.append(block_features)
-                
-                # Extract transaction features
-                for tx in block.get('transactions', []):
-                    if isinstance(tx, dict):  # Full transaction object
-                        tx_features = self._extract_transaction_features(tx)
-                        transactions.append(tx_features)
+        # Create progress bar for block processing
+        with tqdm(block_numbers, desc="Processing blocks", unit="blocks", 
+                  bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]") as pbar:
+            for block_num in pbar:
+                try:
+                    block = self._get_block_by_number(block_num, True)
+                    if not block:
+                        self.logger.warning(f"Could not fetch block {block_num}")
+                        continue
                         
-                # Progress update
-                if (i + 1) % 10 == 0:
-                    progress = (i + 1) / len(block_numbers) * 100
-                    self._update_status("PROCESSING", f"{progress:.1f}% complete")
+                    # Extract block/validator features
+                    block_features = self._extract_block_features(block)
+                    validators.append(block_features)
                     
-                time.sleep(self.fetch_delay)  # Rate limiting
-                
-            except Exception as e:
-                self.logger.error(f"Error processing block {block_num}: {e}")
-                continue
+                    # Extract transaction features
+                    for tx in block.get('transactions', []):
+                        if isinstance(tx, dict):  # Full transaction object
+                            tx_features = self._extract_transaction_features(tx)
+                            transactions.append(tx_features)
+                    
+                    # Update progress bar description with current stats
+                    pbar.set_postfix({
+                        'txs': len(transactions),
+                        'blocks': len(validators)
+                    })
+                        
+                    time.sleep(self.fetch_delay)  # Rate limiting
+                    
+                except Exception as e:
+                    self.logger.error(f"Error processing block {block_num}: {e}")
+                    continue
                 
         return transactions, validators
         
@@ -320,24 +325,29 @@ class EthereumExtractor:
             total_transactions = 0
             total_validators = 0
             
-            for i, (start_time, end_time) in enumerate(intervals):
-                try:
-                    self._update_status("PROCESSING", f"Interval {i+1}/{len(intervals)}")
-                    
-                    # Extract data for this interval
-                    transactions, validators = self._extract_interval_data(start_time, end_time)
-                    
-                    # Save data
-                    self._save_data(start_time, transactions, validators)
-                    
-                    total_transactions += len(transactions)
-                    total_validators += len(validators)
-                    
-                    self.logger.info(f"Completed interval {i+1}/{len(intervals)}")
-                    
-                except Exception as e:
-                    self.logger.error(f"Error processing interval {i+1}: {e}")
-                    continue
+            # Create progress bar for interval processing
+            with tqdm(intervals, desc="Processing intervals", unit="intervals",
+                      bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]") as pbar:
+                for start_time, end_time in pbar:
+                    try:
+                        # Extract data for this interval
+                        transactions, validators = self._extract_interval_data(start_time, end_time)
+                        
+                        # Save data
+                        self._save_data(start_time, transactions, validators)
+                        
+                        total_transactions += len(transactions)
+                        total_validators += len(validators)
+                        
+                        # Update progress bar with current stats
+                        pbar.set_postfix({
+                            'total_txs': total_transactions,
+                            'total_blocks': total_validators
+                        })
+                        
+                    except Exception as e:
+                        self.logger.error(f"Error processing interval: {e}")
+                        continue
                     
             # Final status update
             self._update_status("COMPLETED", f"Extracted {total_transactions} transactions, {total_validators} validator records")

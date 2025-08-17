@@ -1,14 +1,8 @@
 # Ethereum Extraction VM Requirements
 # ==================================
 
-# Core dependencies
+# Core
 requests>=2.31.0
 pandas>=2.0.0
 python-dotenv>=1.0.0
-
-# Optional: for enhanced data processing
-numpy>=1.24.0
-pytz>=2023.3
-
-# Development/debugging tools
 tqdm>=4.65.0
