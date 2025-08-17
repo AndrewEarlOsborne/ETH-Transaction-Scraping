@@ -54,7 +54,7 @@ DATA_DIRECTORY=data
 EOF
 
 # Run extraction
-python3.13 extractor.py
+python3.11 extractor.py
 ```
 
 ## Integration

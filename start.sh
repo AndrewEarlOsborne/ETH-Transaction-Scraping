@@ -14,11 +14,11 @@ echo "Started at: $(date)"
 # Update system packages
 echo "Updating system packages..."
 apt-get update -qq
-apt-get install -y git python3.13 python3.13-pip python3.13-venv screen curl htop
+apt-get install -y git python3.11 python3.11-pip python3.11-venv screen curl htop
 
 # Create Python virtual environment
 echo "Setting up Python environment..."
-python3.13 -m venv py3-venv
+python3.11 -m venv py3-venv
 
 # Install Python dependencies
 echo "Installing Python dependencies..."
@@ -41,7 +41,7 @@ screen -dmS extraction bash -c "
     cd /home/extractor/ETH-Transaction-Scraping
     source py3-venv/bin/activate
     echo 'Starting extraction at $(date)' >> extraction.log
-    python3.13 extractor.py 2>&1 | tee -a extraction.log
+    python3.11 extractor.py 2>&1 | tee -a extraction.log
     echo 'Extraction finished at $(date)' >> extraction.log"
 
 echo "=== Startup Complete ==="
