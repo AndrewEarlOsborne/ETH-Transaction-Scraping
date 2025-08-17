@@ -24,25 +24,7 @@ This is the minimal extraction code that runs on Google Cloud VMs. It's automati
 
 ## Configuration (Set by Orchestrator)
 
-The orchestrator automatically creates a `.env` file on each VM with:
-
-```bash
-# Ethereum provider (rotated across VMs)
-ETHEREUM_PROVIDER_URL=https://eth.drpc.org
-
-# Time range (unique per VM)
-START_DATE=2021-01-01-00:00
-END_DATE=2021-01-2-00:00
-
-# Extraction parameters (from orchestrator config)
-OBSERVATIONS_PER_INTERVAL=100      # How many blocks to sample per interval
-PROVIDER_FETCH_DELAY_SECONDS=0.05  # Rate limiting delay
-INTERVAL_SPAN_TYPE=hour              # day/hour/minute
-INTERVAL_SPAN_LENGTH=1.0            # Length of each interval
-
-# Output
-DATA_DIRECTORY=data
-```
+The orchestrator automatically creates a `.env` file similar to .env.template
 
 ## Output Files
 
@@ -62,9 +44,6 @@ Creates `status.txt` for the orchestrator to monitor:
 If you want to test locally:
 
 ```bash
-# Install dependencies
-pip3 install -r requirements.txt
-
 # Create test config
 cat > .env << EOF
 ETHEREUM_PROVIDER_URL=https://eth.drpc.org
@@ -75,7 +54,7 @@ DATA_DIRECTORY=data
 EOF
 
 # Run extraction
-python3 extractor.py
+python3.13 extractor.py
 ```
 
 ## Integration

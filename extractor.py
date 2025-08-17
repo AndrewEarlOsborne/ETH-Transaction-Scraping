@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.13
 """
 Ethereum Feature Extractor - VM Component
 =========================================
@@ -32,15 +32,24 @@ class EthereumExtractor:
         
     def _setup_logging(self):
         """Configure logging for VM environment."""
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler("extraction.log"),
-                logging.StreamHandler()
-            ]
-        )
+        # Configure file logging with timestamps
+        file_handler = logging.FileHandler("extraction.log")
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        
+        # Configure console logging without timestamps for clean CLI output
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(logging.Formatter('%(message)s'))
+        
+        # Set up logger
         self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+        self.logger.addHandler(file_handler)
+        self.logger.addHandler(console_handler)
+        
+        # Prevent duplicate logs
+        self.logger.propagate = False
         
     def _load_config(self, config_file: str):
         """Load configuration from environment file."""
@@ -75,13 +84,12 @@ class EthereumExtractor:
         self.start_dt = datetime.strptime(self.start_date, '%Y-%m-%d-%H:%M')
         self.end_dt = datetime.strptime(self.end_date, '%Y-%m-%d-%H:%M')
         
-        self.logger.info(f"Configured for {self.start_date} to {self.end_date}")
-        self.logger.info(f"Provider: {self.provider_url}")
+        # These will be shown in the main() header instead
         
     def _setup_data_directory(self):
         """Create data directory structure."""
         os.makedirs(self.data_directory, exist_ok=True)
-        self.logger.info(f"Data directory: {os.path.abspath(self.data_directory)}")
+        # Data directory info will be shown in main() header
         
     def _create_status_file(self):
         """Create status file for monitoring."""
@@ -98,7 +106,8 @@ class EthereumExtractor:
         with open(self.status_file, 'w') as f:
             f.write(status_info + "\n")
             
-        self.logger.info(f"Status: {status} {details}")
+        # Only log status changes to file, not console
+        pass
         
     def _make_eth_request(self, method: str, params: List = None) -> Optional[Dict]:
         """Make JSON-RPC request to Ethereum provider."""
@@ -230,7 +239,7 @@ class EthereumExtractor:
         
     def _extract_interval_data(self, start_time: datetime, end_time: datetime) -> tuple:
         """Extract data for a specific time interval."""
-        self.logger.info(f"Processing interval: {start_time} to {end_time}")
+        # Interval info will be shown via tqdm description
         
         # Find block range for this time interval
         start_timestamp = int(start_time.timestamp())
@@ -243,7 +252,7 @@ class EthereumExtractor:
             self.logger.error(f"Could not find blocks for interval {start_time} to {end_time}")
             return [], []
             
-        self.logger.info(f"Block range: {start_block} to {end_block}")
+        # Block range will be shown via tqdm description
         
         # Sample blocks within the interval
         total_blocks = end_block - start_block + 1
@@ -260,13 +269,13 @@ class EthereumExtractor:
         validators = []
         
         # Create progress bar for block processing
-        with tqdm(block_numbers, desc="Processing blocks", unit="blocks", 
-                  bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]") as pbar:
+        with tqdm(block_numbers, desc=f"Blocks {start_block}-{end_block}", unit="blk", 
+                  bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
+                  leave=False) as pbar:
             for block_num in pbar:
                 try:
                     block = self._get_block_by_number(block_num, True)
                     if not block:
-                        self.logger.warning(f"Could not fetch block {block_num}")
                         continue
                         
                     # Extract block/validator features
@@ -279,16 +288,12 @@ class EthereumExtractor:
                             tx_features = self._extract_transaction_features(tx)
                             transactions.append(tx_features)
                     
-                    # Update progress bar description with current stats
-                    pbar.set_postfix({
-                        'txs': len(transactions),
-                        'blocks': len(validators)
-                    })
+                    # Update progress bar with current stats
+                    pbar.set_postfix_str(f"txs: {len(transactions)}, blocks: {len(validators)}")
                         
                     time.sleep(self.fetch_delay)  # Rate limiting
                     
-                except Exception as e:
-                    self.logger.error(f"Error processing block {block_num}: {e}")
+                except Exception:
                     continue
                 
         return transactions, validators
@@ -302,34 +307,38 @@ class EthereumExtractor:
             tx_df = pd.DataFrame(transactions)
             tx_file = os.path.join(self.data_directory, f"{timestamp_str}_transactions.csv")
             tx_df.to_csv(tx_file, index=False)
-            self.logger.info(f"Saved {len(transactions)} transactions to {tx_file}")
+            # Save info will be shown in final summary
             
         # Save validators/blocks
         if validators:
             val_df = pd.DataFrame(validators)
             val_file = os.path.join(self.data_directory, f"{timestamp_str}_validator_transactions.csv")
             val_df.to_csv(val_file, index=False)
-            self.logger.info(f"Saved {len(validators)} validator records to {val_file}")
+            # Save info will be shown in final summary
             
     def run(self):
         """Main extraction process."""
         try:
-            self.logger.info("Starting Ethereum feature extraction")
+            print("\n🚀 Starting extraction...")
             self._update_status("RUNNING", "Generating time intervals")
             
             # Generate time intervals
             intervals = self._generate_time_intervals()
-            self.logger.info(f"Generated {len(intervals)} time intervals")
+            print(f"📊 Processing {len(intervals)} time interval{'s' if len(intervals) != 1 else ''}")
             
             # Process each interval
             total_transactions = 0
             total_validators = 0
             
-            # Create progress bar for interval processing
-            with tqdm(intervals, desc="Processing intervals", unit="intervals",
-                      bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]") as pbar:
+            # Create progress bar for interval processing  
+            with tqdm(intervals, desc="Intervals", unit="int",
+                      bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]") as pbar:
                 for start_time, end_time in pbar:
                     try:
+                        # Update description with current interval
+                        interval_desc = f"{start_time.strftime('%m/%d %H:%M')}-{end_time.strftime('%H:%M')}"
+                        pbar.set_description(f"Processing {interval_desc}")
+                        
                         # Extract data for this interval
                         transactions, validators = self._extract_interval_data(start_time, end_time)
                         
@@ -339,19 +348,15 @@ class EthereumExtractor:
                         total_transactions += len(transactions)
                         total_validators += len(validators)
                         
-                        # Update progress bar with current stats
-                        pbar.set_postfix({
-                            'total_txs': total_transactions,
-                            'total_blocks': total_validators
-                        })
+                        # Update progress bar with running totals
+                        pbar.set_postfix_str(f"total: {total_transactions:,} txs, {total_validators} blocks")
                         
-                    except Exception as e:
-                        self.logger.error(f"Error processing interval: {e}")
+                    except Exception:
                         continue
                     
             # Final status update
             self._update_status("COMPLETED", f"Extracted {total_transactions} transactions, {total_validators} validator records")
-            self.logger.info("Extraction completed successfully")
+            print(f"\n✅ Extracted {total_transactions:,} transactions and {total_validators:,} validator records")
             
         except Exception as e:
             self.logger.error(f"Extraction failed: {e}")
@@ -367,10 +372,16 @@ def main():
         print("=" * 60)
         
         extractor = EthereumExtractor()
+        
+        # Show configuration summary
+        print(f"📅 Period: {extractor.start_date} to {extractor.end_date}")
+        print(f"🌐 Provider: {extractor.provider_url}")
+        print(f"📁 Data directory: {os.path.abspath(extractor.data_directory)}")
+        
         extractor.run()
         
-        print("=" * 60)
-        print("Extraction completed successfully!")
+        print("\n" + "=" * 60)
+        print("✅ Extraction completed successfully!")
         print("=" * 60)
         
     except Exception as e:
