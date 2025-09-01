@@ -7,7 +7,7 @@ echo "Started at: $(date)"
 # Update system packages
 echo "Updating system packages..."
 apt-get update -qq
-apt-get install -y git python3.11 python3.11-pip python3.11-venv screen curl htop
+apt-get install -y git python3.11 python3-pip python3.11-venv screen curl htop
 
 # Create Python virtual environment
 echo "Setting up Python environment..."
