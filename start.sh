@@ -1,11 +1,4 @@
 #!/bin/bash
-"""
-Ethereum Extraction VM Startup Script
-=====================================
-
-
-"""
-
 set -e
 
 echo "=== Ethereum Extraction VM Startup ==="
