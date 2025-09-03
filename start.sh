@@ -7,7 +7,7 @@ echo "Started at: $(date)"
 # Update system packages
 echo "Updating system packages..."
 apt-get update -qq
-apt-get install -y git python3.11 python3-pip python3.11-venv screen curl htop
+apt-get install -y python3.11 python3-pip python3.11-venv screen curl htop
 
 # Create Python virtual environment
 echo "Setting up Python environment..."
@@ -33,6 +33,7 @@ echo "Starting extraction process in screen session..."
 screen -dmS extraction bash -c 'cd /home/$(whoami) && source 
 extractor/py3-venv/bin/activate && python3 extractor/main.py > 
 extraction.log 2>&1; echo "COMPLETED" > status.txt'
+echo screen -ls
 
 echo "=== Startup Complete ==="
 echo "Extraction is running in screen session 'extraction'"
