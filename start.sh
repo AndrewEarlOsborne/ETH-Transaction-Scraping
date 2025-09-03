@@ -17,7 +17,7 @@ python3.11 -m venv extractor/py3-venv
 echo "Installing Python dependencies..."
 source extractor/py3-venv/bin/activate && \
 pip install --upgrade pip && \
-pip install -r extractor/requirements.txt
+pip install -r requirements.txt
 
 # Verify .env file was created by orchestrator
 if [ ! -f ".env" ]; then
