@@ -17,7 +17,7 @@ python3.11 -m venv extractor/py3-venv
 echo "Installing Python dependencies..."
 source extractor/py3-venv/bin/activate && \
 pip install --upgrade pip && \
-pip install -r requirements.txt
+pip install -r extractor/requirements.txt
 
 # Verify .env file was created by orchestrator
 if [ ! -f ".env" ]; then
@@ -26,13 +26,11 @@ if [ ! -f ".env" ]; then
 fi
 
 echo "Configuration loaded:"
-cat .env
+cat extractor/.env
 
 # Start extraction process in screen session
 echo "Starting extraction process in screen session..."
-screen -dmS extraction bash -c 'cd /home/$(whoami) && source 
-extractor/py3-venv/bin/activate && python3 extractor/main.py > 
-extraction.log 2>&1; echo "COMPLETED" > status.txt'
+screen -dmS extraction bash -c 'source extractor/py3-venv/bin/activate && python3 extractor/extractor.py > extraction.log 2>&1; echo "COMPLETED" > status.txt'
 echo screen -ls
 
 echo "=== Startup Complete ==="
