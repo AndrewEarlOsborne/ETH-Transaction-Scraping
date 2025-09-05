@@ -20,7 +20,7 @@ pip install --upgrade pip && \
 pip install -r extractor/requirements.txt
 
 # Verify .env file was created by orchestrator
-if [ ! -f ".env" ]; then
+if [ ! -f "extractor/.env" ]; then
     echo "ERROR: .env file not found!"
     exit 1
 fi
