@@ -23,10 +23,10 @@ from tqdm import tqdm
 class EthereumExtractor:
     """Minimal Ethereum data extractor for VM deployment."""
     
-    def __init__(self, config_file: str = '.env'):
+    def __init__(self):
         """Initialize extractor with configuration."""
         self._setup_logging()
-        self._load_config(config_file)
+        self._load_config('.env')
         self._setup_data_directory()
         self._create_status_file()
         
