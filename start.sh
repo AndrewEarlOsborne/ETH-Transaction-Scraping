@@ -11,20 +11,20 @@ sudo apt-get install -y python3.11 python3-pip python3.11-venv screen curl htop 
 
 # Create Python virtual environment
 echo "Setting up Python environment..."
-python3.11 -m venv extractor/py3-venv
+python3.11 -m venv py3-venv
 
 # Install Python dependencies
 echo "Installing Python dependencies..."
-source extractor/py3-venv/bin/activate && \
+source py3-venv/bin/activate && \
 pip install --upgrade pip && \
-pip install -r extractor/requirements.txt
+pip install -r requirements.txt
 
 echo "Configuration loaded:"
 cat .env
 
 # Start extraction process in screen session
 echo "Starting extraction process in screen session..."
-screen -dmS extraction bash -c 'source extractor/py3-venv/bin/activate && python3 extractor/extractor.py > extraction.log 2>&1; echo "COMPLETED" > status.txt'
+screen -dmS extraction bash -c 'source py3-venv/bin/activate && python3 extractor.py > extraction.log 2>&1; echo "COMPLETED" > status.txt'
 echo screen -ls
 
 echo "=== Startup Complete ==="
