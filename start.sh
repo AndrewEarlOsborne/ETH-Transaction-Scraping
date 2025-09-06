@@ -20,7 +20,7 @@ pip install --upgrade pip && \
 pip install -r extractor/requirements.txt
 
 echo "Configuration loaded:"
-cat ../.env
+cat .env
 
 # Start extraction process in screen session
 echo "Starting extraction process in screen session..."
