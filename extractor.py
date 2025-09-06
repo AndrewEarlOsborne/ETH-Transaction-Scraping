@@ -26,7 +26,11 @@ class EthereumExtractor:
     def __init__(self):
         """Initialize extractor with configuration."""
         self._setup_logging()
-        self._load_config('.env')
+        try:
+            self._load_config('.env')
+        except ValueError:
+            self.logger.info("Trying parent .env")
+            self.load_config('../.env')
         self._setup_data_directory()
         self._create_status_file()
         
