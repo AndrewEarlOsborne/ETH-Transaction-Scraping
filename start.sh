@@ -30,4 +30,4 @@ echo screen -ls
 echo "=== Startup Complete ==="
 echo "Extraction is running in screen session 'extraction'"
 echo "Use 'screen -r extraction' to attach to the session"
-echo "Check logs with: tail -f /home/$(whoami)/extraction.log"
+echo "Check logs with: tail -f extractor/extraction.log"

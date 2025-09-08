@@ -1,4 +1,4 @@
-# Ethereum Feature Extractor - VM Component
+# Ethereum Feature Extractor for Transaction data
 
 This is the minimal extraction code that runs on Google Cloud VMs. It's automatically deployed and configured by the orchestrator.
 

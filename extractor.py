@@ -1,6 +1,6 @@
 #!/usr/bin/env python3.11
 """
-Ethereum Feature Extractor - VM Component
+Ethereum Feature Extractor
 =========================================
 
 Minimal extraction script that runs independently on VMs.
@@ -79,6 +79,9 @@ class EthereumExtractor:
         self.interval_type = os.getenv('INTERVAL_SPAN_TYPE', 'day')
         self.interval_length = float(os.getenv('INTERVAL_SPAN_LENGTH', '1.0'))
         self.data_directory = os.getenv('DATA_DIRECTORY', 'data')
+        
+        # ETH 2.0 deposit contract address (mainnet)
+        self.eth2_deposit_contract = '0x00000000219ab540356cBB839Cbe05303d7705Fa'
         
         # Parse dates
         self.start_dt = datetime.strptime(self.start_date, '%Y-%m-%d-%H:%M')
@@ -200,21 +203,12 @@ class EthereumExtractor:
             'input_data_size': len(transaction.get('input', '')) // 2 - 1,  # Subtract '0x'
             'is_contract_creation': transaction.get('to') is None
         }
+
+    def _is_validator_transaction(self, transaction: Dict) -> bool:
+        """Check if transaction is sent to ETH 2.0 deposit contract."""
+        to_address = transaction.get('to', '')
+        return to_address and to_address.lower() == self.eth2_deposit_contract.lower()
         
-    def _extract_block_features(self, block: Dict) -> Dict:
-        """Extract features from a block."""
-        return {
-            'number': int(block.get('number', '0x0'), 16),
-            'timestamp': int(block.get('timestamp', '0x0'), 16),
-            'transaction_count': len(block.get('transactions', [])),
-            'gas_limit': int(block.get('gasLimit', '0x0'), 16),
-            'gas_used': int(block.get('gasUsed', '0x0'), 16),
-            'difficulty': int(block.get('difficulty', '0x0'), 16),
-            'total_difficulty': int(block.get('totalDifficulty', '0x0'), 16),
-            'size': int(block.get('size', '0x0'), 16),
-            'miner': block.get('miner', ''),
-            'extra_data_size': len(block.get('extraData', '')) // 2 - 1
-        }
         
     def _generate_time_intervals(self) -> List[tuple]:
         """Generate time intervals for extraction."""
@@ -239,8 +233,7 @@ class EthereumExtractor:
         
     def _extract_interval_data(self, start_time: datetime, end_time: datetime) -> tuple:
         """Extract data for a specific time interval."""
-        # Interval info will be shown via tqdm description
-        
+
         # Find block range for this time interval
         start_timestamp = int(start_time.timestamp())
         end_timestamp = int(end_time.timestamp())
@@ -251,8 +244,6 @@ class EthereumExtractor:
         if not start_block or not end_block:
             self.logger.error(f"Could not find blocks for interval {start_time} to {end_time}")
             return [], []
-            
-        # Block range will be shown via tqdm description
         
         # Sample blocks within the interval
         total_blocks = end_block - start_block + 1
@@ -268,107 +259,147 @@ class EthereumExtractor:
         transactions = []
         validators = []
         
-        # Create progress bar for block processing
-        with tqdm(block_numbers, desc=f"Blocks {start_block}-{end_block}", unit="blk", 
-                  bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
-                  leave=False) as pbar:
-            for block_num in pbar:
-                try:
-                    block = self._get_block_by_number(block_num, True)
-                    if not block:
-                        continue
-                        
-                    # Extract block/validator features
-                    block_features = self._extract_block_features(block)
-                    validators.append(block_features)
-                    
-                    # Extract transaction features
-                    for tx in block.get('transactions', []):
-                        if isinstance(tx, dict):  # Full transaction object
-                            tx_features = self._extract_transaction_features(tx)
-                            transactions.append(tx_features)
-                    
-                    # Update progress bar with current stats
-                    pbar.set_postfix_str(f"txs: {len(transactions)}, blocks: {len(validators)}")
-                        
-                    time.sleep(self.fetch_delay)  # Rate limiting
-                    
-                except Exception:
+        for block_num in block_numbers:
+            try:
+                block = self._get_block_by_number(block_num, True)
+                if not block:
                     continue
+                
+                # Extract transaction features
+                for tx in block.get('transactions', []):
+                    if isinstance(tx, dict):  # Full transaction object
+                        tx_features = self._extract_transaction_features(tx)
+                        transactions.append(tx_features)
+                        
+                        # Check if this is a validator transaction
+                        if self._is_validator_transaction(tx):
+                            validators.append(tx_features)
+                    
+                time.sleep(self.fetch_delay)  # Rate limiting
+                
+            except Exception:
+                continue
                 
         return transactions, validators
         
-    def _save_data(self, interval_start: datetime, transactions: List[Dict], validators: List[Dict]):
-        """Save extracted data to CSV files."""
-        timestamp_str = interval_start.strftime('%Y%m%d_%H%M%S')
+    def _append_to_csv(self, file_path: str, data: Dict):
+        """Append a single row of data to CSV file."""
+        df = pd.DataFrame([data])
         
-        # Save transactions
-        if transactions:
-            tx_df = pd.DataFrame(transactions)
-            tx_file = os.path.join(self.data_directory, f"{timestamp_str}_transactions.csv")
-            tx_df.to_csv(tx_file, index=False)
-            # Save info will be shown in final summary
-            
-        # Save validators/blocks
-        if validators:
-            val_df = pd.DataFrame(validators)
-            val_file = os.path.join(self.data_directory, f"{timestamp_str}_validator_transactions.csv")
-            val_df.to_csv(val_file, index=False)
-            # Save info will be shown in final summary
+        if os.path.exists(file_path):
+            df.to_csv(file_path, mode='a', header=False, index=False)
+        else:
+            df.to_csv(file_path, index=False)
             
     def run(self):
         """Main extraction process."""
         try:
             print("\n🚀 Starting extraction...")
-            self._update_status("RUNNING", "Generating time intervals")
+            self._update_status("RUNNING", "0/0")
             
             # Generate time intervals
             intervals = self._generate_time_intervals()
             print(f"📊 Processing {len(intervals)} time interval{'s' if len(intervals) != 1 else ''}")
             
+            # Set up output file names based on first interval
+            if intervals:
+                first_interval_str = intervals[0][0].strftime('%Y%m%d_%H%M%S')
+                whale_file = os.path.join(self.data_directory, f"{first_interval_str}_whale_transactions.csv")
+                validator_file = os.path.join(self.data_directory, f"{first_interval_str}_validator_transactions.csv")
+            
             # Process each interval
             total_transactions = 0
             total_validators = 0
+            total_intervals = len(intervals)
             
             # Create progress bar for interval processing  
             with tqdm(intervals, desc="Intervals", unit="int",
                       bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]") as pbar:
-                for start_time, end_time in pbar:
+                for i, (start_time, end_time) in enumerate(pbar):
                     try:
-                        # Update description with current interval
-                        interval_desc = f"{start_time.strftime('%m/%d %H:%M')}-{end_time.strftime('%H:%M')}"
-                        pbar.set_description(f"Processing {interval_desc}")
-                        
                         # Extract data for this interval
                         transactions, validators = self._extract_interval_data(start_time, end_time)
                         
-                        # Save data
-                        self._save_data(start_time, transactions, validators)
+                        # Aggregate whale transactions into a summary
+                        whale_result = self.summarize_whale_transactions(transactions)
+                        whale_result['interval_start'] = start_time.isoformat()
+                        whale_result['interval_end'] = end_time.isoformat()
+
+                        # Aggregate validator transactions
+                        validators_result = self.summarize_validator_transactions(validators)
+                        validators_result['interval_start'] = start_time.isoformat()
+                        validators_result['interval_end'] = end_time.isoformat()
+                        
+                        # Append aggregated data to CSV files
+                        if whale_result:
+                            self._append_to_csv(whale_file, whale_result)
+                        if validators_result:
+                            self._append_to_csv(validator_file, validators_result)
                         
                         total_transactions += len(transactions)
                         total_validators += len(validators)
                         
-                        # Update progress bar with running totals
-                        pbar.set_postfix_str(f"total: {total_transactions:,} txs, {total_validators} blocks")
+                        # Update status file with interval progress
+                        completed_intervals = i + 1
+                        self._update_status("RUNNING", f"{completed_intervals}/{total_intervals}")
                         
                     except Exception:
                         continue
                     
             # Final status update
-            self._update_status("COMPLETED", f"Extracted {total_transactions} transactions, {total_validators} validator records")
-            print(f"\n✅ Extracted {total_transactions:,} transactions and {total_validators:,} validator records")
+            self._update_status("COMPLETED", f"{total_intervals}/{total_intervals}")
+            print(f"\nExtracted {total_transactions:,} transactions and {total_validators:,} validator records")
             
         except Exception as e:
             self.logger.error(f"Extraction failed: {e}")
             self._update_status("FAILED", str(e))
             raise
 
+    def summarize_whale_transactions(self, transactions: List[Dict]) -> Dict:
+        """Summarize whale transactions across all data. Pass the data as all data for one interval."""
+        if not transactions:
+            return {}
+            
+        df = pd.DataFrame(transactions)
+        whale_threshold = 1e18  # 1 ETH in wei
+        whale_txs = df[df['value'] >= whale_threshold]
+        
+        if whale_txs.empty:
+            return {
+                'whale_count': 0,
+                'whale_avg_value_eth': 0,
+                'whale_total_value_eth': 0
+            }
+            
+        return {
+            'whale_count': len(whale_txs),
+            'whale_avg_value_eth': whale_txs['value'].mean() / 1e18,
+            'whale_total_value_eth': whale_txs['value'].sum() / 1e18
+        }
+
+    def summarize_validator_transactions(self, validators: List[Dict]) -> Dict:
+        """Summarize validator transaction data."""
+        if not validators:
+            return {
+                'validator_count': 0,
+                'validator_total_value_eth': 0,
+                'validator_avg_value_eth': 0,
+                'validator_avg_gas_price': 0
+            }
+            
+        df = pd.DataFrame(validators)
+        return {
+            'validator_count': len(df),
+            'validator_total_value_eth': df['value'].sum() / 1e18,  # Convert wei to ETH
+            'validator_avg_value_eth': df['value'].mean() / 1e18,
+            'validator_avg_gas_price': df['gas_price'].mean()
+        }
 
 def main():
     """Main entry point for VM extraction."""
     try:
         print("=" * 60)
-        print("Ethereum Feature Extractor - VM Component")
+        print("Ethereum Feature Extractor")
         print("=" * 60)
         
         extractor = EthereumExtractor()
