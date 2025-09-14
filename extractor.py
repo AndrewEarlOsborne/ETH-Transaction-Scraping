@@ -200,14 +200,12 @@ class EthereumExtractor:
             'gas': int(transaction.get('gas', '0x0'), 16),
             'gas_price': int(transaction.get('gasPrice', '0x0'), 16),
             'nonce': int(transaction.get('nonce', '0x0'), 16),
-            'input_data_size': len(transaction.get('input', '')) // 2 - 1,  # Subtract '0x'
-            'is_contract_creation': transaction.get('to') is None
         }
 
     def _is_validator_transaction(self, transaction: Dict) -> bool:
         """Check if transaction is sent to ETH 2.0 deposit contract."""
-        to_address = transaction.get('to', '')
-        return to_address and to_address.lower() == self.eth2_deposit_contract.lower()
+        to_address = transaction.get('to')
+        return to_address.lower() == self.eth2_deposit_contract.lower()
         
         
     def _generate_time_intervals(self) -> List[tuple]:
@@ -237,25 +235,21 @@ class EthereumExtractor:
         # Find block range for this time interval
         start_timestamp = int(start_time.timestamp())
         end_timestamp = int(end_time.timestamp())
-        
+
         start_block = self._get_block_number_by_timestamp(start_timestamp)
         end_block = self._get_block_number_by_timestamp(end_timestamp)
-        
+
         if not start_block or not end_block:
             self.logger.error(f"Could not find blocks for interval {start_time} to {end_time}")
             return [], []
-        
-        # Sample blocks within the interval
+
+        # Process ALL blocks within the interval (no sampling)
         total_blocks = end_block - start_block + 1
-        if total_blocks <= self.observations_per_interval:
-            # Use all blocks if we have fewer than requested observations
-            block_numbers = list(range(start_block, end_block + 1))
-        else:
-            # Sample evenly distributed blocks
-            step = total_blocks / self.observations_per_interval
-            block_numbers = [start_block + int(i * step) for i in range(self.observations_per_interval)]
+        block_numbers = list(range(start_block, end_block + 1))
+
+        self.logger.info(f"Processing {total_blocks} blocks ({start_block} to {end_block}) for interval {start_time.strftime('%Y-%m-%d %H:%M')} to {end_time.strftime('%Y-%m-%d %H:%M')}")
             
-        # Extract data from sampled blocks
+        # Extract data from all blocks
         transactions = []
         validators = []
         
