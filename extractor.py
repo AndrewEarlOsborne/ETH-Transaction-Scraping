@@ -203,9 +203,16 @@ class EthereumExtractor:
         }
 
     def _is_validator_transaction(self, transaction: Dict) -> bool:
-        """Check if transaction is sent to ETH 2.0 deposit contract."""
+        """Check if transaction is sent to ETH 2.0 deposit contract with 32+ ETH."""
         to_address = transaction.get('to')
-        return to_address.lower() == self.eth2_deposit_contract.lower()
+        if not to_address or to_address.lower() != self.eth2_deposit_contract.lower():
+            return False
+
+        # Check if transaction value is at least 32 ETH (32 * 10^18 wei)
+        value_wei = int(transaction.get('value', '0x0'), 16) if isinstance(transaction.get('value'), str) else transaction.get('value', 0)
+        min_validator_amount = 32 * 10**18  # 32 ETH in wei
+
+        return value_wei >= min_validator_amount
         
         
     def _generate_time_intervals(self) -> List[tuple]:
