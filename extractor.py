@@ -209,9 +209,13 @@ class EthereumExtractor:
             return False
 
         # Check if transaction value is at least 32 ETH (32 * 10^18 wei)
-        value_wei = int(transaction.get('value', '0x0'), 16) if isinstance(transaction.get('value'), str) else transaction.get('value', 0)
-        min_validator_amount = 32 * 10**18  # 32 ETH in wei
+        value = transaction.get('value', '0x0')
+        if isinstance(value, str):
+            value_wei = int(value, 16)
+        else:
+            value_wei = int(value) if value else 0
 
+        min_validator_amount = 32 * 10**18  # 32 ETH in wei
         return value_wei >= min_validator_amount
         
         
