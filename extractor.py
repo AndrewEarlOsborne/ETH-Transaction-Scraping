@@ -219,11 +219,37 @@ class EthereumExtractor:
         return value_wei >= min_validator_amount
         
         
+    def _normalize_to_interval_boundary(self, dt: datetime) -> datetime:
+        """Normalize datetime to the interval boundary based on interval_type."""
+        if self.interval_type == 'day':
+            # Round down to start of day
+            normalized = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif self.interval_type == 'hour':
+            # Round down to start of hour
+            normalized = dt.replace(minute=0, second=0, microsecond=0)
+        elif self.interval_type == 'minute':
+            # Round down to start of minute
+            normalized = dt.replace(second=0, microsecond=0)
+        else:
+            # No normalization for unsupported types
+            normalized = dt
+
+        return normalized
+
     def _generate_time_intervals(self) -> List[tuple]:
         """Generate time intervals for extraction."""
         intervals = []
-        current = self.start_dt
-        
+
+        # Normalize start and end times to interval boundaries
+        current = self._normalize_to_interval_boundary(self.start_dt)
+        end = self._normalize_to_interval_boundary(self.end_dt)
+
+        # Log if adjustments were made
+        if current != self.start_dt:
+            self.logger.info(f"Adjusted start time from {self.start_dt.strftime('%Y-%m-%d %H:%M:%S')} to {current.strftime('%Y-%m-%d %H:%M:%S')} (interval boundary)")
+        if end != self.end_dt:
+            self.logger.info(f"Adjusted end time from {self.end_dt.strftime('%Y-%m-%d %H:%M:%S')} to {end.strftime('%Y-%m-%d %H:%M:%S')} (interval boundary)")
+
         if self.interval_type == 'day':
             delta = timedelta(days=self.interval_length)
         elif self.interval_type == 'hour':
@@ -232,12 +258,12 @@ class EthereumExtractor:
             delta = timedelta(minutes=self.interval_length)
         else:
             raise ValueError(f"Unsupported interval type: {self.interval_type}")
-            
-        while current < self.end_dt:
-            interval_end = min(current + delta, self.end_dt)
+
+        while current < end:
+            interval_end = min(current + delta, end)
             intervals.append((current, interval_end))
             current = interval_end
-            
+
         return intervals
         
     def _extract_interval_data(self, start_time: datetime, end_time: datetime) -> tuple:
