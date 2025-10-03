@@ -9,7 +9,6 @@ Designed to run until completion in a screen session.
 
 import os
 import sys
-import json
 import time
 import logging
 import requests
@@ -61,8 +60,8 @@ class EthereumExtractor:
         # Required configurations
         required = {
             'ETHEREUM_PROVIDER_URL': os.getenv('ETHEREUM_PROVIDER_URL'),
-            'START_DATE': os.getenv('START_DATE'),
-            'END_DATE': os.getenv('END_DATE'),
+            'INTERVAL_START': os.getenv('INTERVAL_START'),
+            'INTERVAL_END': os.getenv('INTERVAL_END'),
         }
         
         missing = [k for k, v in required.items() if not v]
@@ -70,8 +69,8 @@ class EthereumExtractor:
             raise ValueError(f"Missing required config: {missing}")
             
         self.provider_url = required['ETHEREUM_PROVIDER_URL']
-        self.start_date = required['START_DATE']
-        self.end_date = required['END_DATE']
+        self.interval_start = required['INTERVAL_START']
+        self.interval_end = required['INTERVAL_END']
         
         # Optional configurations with defaults
         self.observations_per_interval = int(os.getenv('OBSERVATIONS_PER_INTERVAL', '100'))
@@ -84,8 +83,8 @@ class EthereumExtractor:
         self.eth2_deposit_contract = '0x00000000219ab540356cBB839Cbe05303d7705Fa'
         
         # Parse dates
-        self.start_dt = datetime.strptime(self.start_date, '%Y-%m-%d-%H:%M')
-        self.end_dt = datetime.strptime(self.end_date, '%Y-%m-%d-%H:%M')
+        self.start_dt = datetime.strptime(self.interval_start, '%Y-%m-%d-%H:%M')
+        self.end_dt = datetime.strptime(self.interval_end, '%Y-%m-%d-%H:%M')
         
         # These will be shown in the main() header instead
         
@@ -347,38 +346,38 @@ class EthereumExtractor:
             with tqdm(intervals, desc="Intervals", unit="int",
                       bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]") as pbar:
                 for i, (start_time, end_time) in enumerate(pbar):
-                    try:
-                        # Extract data for this interval
-                        transactions, validators = self._extract_interval_data(start_time, end_time)
-                        
-                        # Aggregate whale transactions into a summary
-                        whale_result = self.summarize_whale_transactions(transactions)
-                        whale_result['interval_start'] = start_time.isoformat()
-                        whale_result['interval_end'] = end_time.isoformat()
 
-                        # Aggregate validator transactions
-                        validators_result = self.summarize_validator_transactions(validators)
-                        validators_result['interval_start'] = start_time.isoformat()
-                        validators_result['interval_end'] = end_time.isoformat()
-                        
-                        # Append aggregated data to CSV files
-                        if whale_result:
-                            self._append_to_csv(whale_file, whale_result)
-                        if validators_result:
-                            self._append_to_csv(validator_file, validators_result)
-                        
-                        total_transactions += len(transactions)
-                        total_validators += len(validators)
-                        
-                        # Update status file with interval progress
-                        completed_intervals = i + 1
-                        self._update_status("RUNNING", f"{completed_intervals}/{total_intervals}")
-                        
-                    except Exception:
-                        continue
+                    # Extract data for this interval
+                    transactions, validators = self._extract_interval_data(start_time, end_time)
+                    
+                    # Aggregate whale transactions into a summary
+                    whale_result = self.summarize_whale_transactions(transactions)
+                    whale_result['interval_start'] = start_time.isoformat()
+                    whale_result['interval_end'] = end_time.isoformat()
+
+                    # Aggregate validator transactions
+                    validators_result = self.summarize_validator_transactions(validators)
+                    validators_result['interval_start'] = start_time.isoformat()
+                    validators_result['interval_end'] = end_time.isoformat()
+                    
+                    # Append aggregated data to CSV files
+                    if whale_result:
+                        self._append_to_csv(whale_file, whale_result)
+                    if validators_result:
+                        self._append_to_csv(validator_file, validators_result)
+                    
+                    total_transactions += len(transactions)
+                    total_validators += len(validators)
+                    
+                    # Update status file with interval progress
+                    completed_intervals = i + 1
+                    self._update_status("RUNNING", f"{completed_intervals}/{total_intervals}")
                     
             # Final status update
-            self._update_status("COMPLETED", f"{total_intervals}/{total_intervals}")
+            if self.check_completed(validator_file):
+                self._update_status("COMPLETED", f"{total_intervals}/{total_intervals}")
+            else:
+                self._update_status("FAILED", "Incomplete extraction")
             print(f"\nExtracted {total_transactions:,} transactions and {total_validators:,} validator records")
             
         except Exception as e:
@@ -426,6 +425,20 @@ class EthereumExtractor:
             'validator_avg_gas_price': df['gas_price'].mean()
         }
 
+    def check_completed(self, file_path: str) -> bool:
+        with open(file_path) as f:
+            for line in f:
+                pass
+            last_line = line.strip()
+            # Convert interval_end to ISO format to match CSV format
+            expected_end = self.end_dt.isoformat()
+            if expected_end in last_line:
+                return True
+            else:
+                self.logger.error(f"Last line does not match expected end interval: {expected_end} :: in :: {last_line.strip()}")
+                return True
+        return False
+
 def main():
     """Main entry point for VM extraction."""
     try:
@@ -436,14 +449,14 @@ def main():
         extractor = EthereumExtractor()
         
         # Show configuration summary
-        print(f"📅 Period: {extractor.start_date} to {extractor.end_date}")
-        print(f"🌐 Provider: {extractor.provider_url}")
-        print(f"📁 Data directory: {os.path.abspath(extractor.data_directory)}")
+        print(f"Period: {extractor.interval_start} to {extractor.interval_end}")
+        print(f"Provider: {extractor.provider_url}")
+        print(f"Data directory: {os.path.abspath(extractor.data_directory)}")
         
         extractor.run()
         
         print("\n" + "=" * 60)
-        print("✅ Extraction completed successfully!")
+        print("Extraction completed successfully!")
         print("=" * 60)
         
     except Exception as e:
