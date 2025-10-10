@@ -100,14 +100,18 @@ class EthereumExtractor:
         
     def _update_status(self, status: str, details: str = ""):
         """Update status file."""
-        timestamp = datetime.now().isoformat()
-        status_info = f"{timestamp} - {status}"
-        if details:
-            status_info += f" - {details}"
-            
-        with open(self.status_file, 'w') as f:
-            f.write(status_info + "\n")
-            
+        try:
+            timestamp = datetime.now().isoformat()
+            status_info = f"{timestamp} - {status}"
+            if details:
+                status_info += f" - {details}"
+
+            with open(self.status_file, 'w') as f:
+                f.write(status_info + "\n")
+                f.flush()  # Ensure immediate write
+        except Exception as e:
+            self.logger.error(f"Failed to update status: {e}")
+
         # Only log status changes to file, not console
         pass
         
@@ -375,7 +379,7 @@ class EthereumExtractor:
                     
             # Final status update
             if self.check_completed(validator_file):
-                self._update_status("COMPLETED", f"{total_intervals}/{total_intervals}")
+                self._update_status("COMPLETED", f"{completed_intervals}/{total_intervals}")
             else:
                 self._update_status("FAILED", "Incomplete extraction")
             print(f"\nExtracted {total_transactions:,} transactions and {total_validators:,} validator records")
