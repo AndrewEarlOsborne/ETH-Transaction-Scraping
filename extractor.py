@@ -74,7 +74,7 @@ class EthereumExtractor:
         
         # Optional configurations with defaults
         self.observations_per_interval = int(os.getenv('OBSERVATIONS_PER_INTERVAL', '100'))
-        self.fetch_delay = float(os.getenv('PROVIDER_FETCH_DELAY_SECONDS', '0.05'))
+        self.fetch_delay = float(os.getenv('PROVIDER_FETCH_DELAY_SECONDS', '0.07'))
         self.interval_type = os.getenv('INTERVAL_SPAN_TYPE', 'day')
         self.interval_length = float(os.getenv('INTERVAL_SPAN_LENGTH', '1.0'))
         self.data_directory = os.getenv('DATA_DIRECTORY', 'data')
@@ -377,8 +377,10 @@ class EthereumExtractor:
                     completed_intervals = i + 1
                     self._update_status("RUNNING", f"{completed_intervals}/{total_intervals}")
                     
+            
             # Final status update
             if self.check_completed(validator_file):
+                self.aggregate_results()
                 self._update_status("COMPLETED", f"{completed_intervals}/{total_intervals}")
             else:
                 self._update_status("FAILED", "Incomplete extraction")
@@ -442,6 +444,39 @@ class EthereumExtractor:
                 self.logger.error(f"Last line does not match expected end interval: {expected_end} :: in :: {last_line.strip()}")
                 return True
         return False
+    
+    def aggregate_results(self):
+        """Aggregate all result files into a single combined CSV."""
+        validator_results: pd.DataFrame = pd.DataFrame()
+        whale_results: pd.DataFrame = pd.DataFrame()
+
+        for file in os.listdir(self.data_directory):
+            if file.endswith("validator_transactions.csv"):
+                file_path = os.path.join(self.data_directory, file)
+                df = pd.read_csv(file_path)
+                validator_results = pd.concat([validator_results, df], ignore_index=True)
+
+            elif file.endswith("whale_transactions.csv"):
+                file_path = os.path.join(self.data_directory, file)
+                df = pd.read_csv(file_path)
+                whale_results = pd.concat([whale_results, df], ignore_index=True)
+
+        # Merge results into one
+        if not whale_results.empty and not validator_results.empty:
+            aggregate_results: pd.DataFrame = pd.merge(
+                whale_results,
+                validator_results,
+                how='inner',
+                on=['interval_start', 'interval_end']
+            )
+
+            # Save aggregated results
+            output_file = os.path.join(self.data_directory, 'aggregated_results.csv')
+            aggregate_results.to_csv(output_file, index=False)
+            self.logger.info(f"Aggregated results saved to {output_file}")
+        else:
+            self.logger.warning("No data to aggregate")
+
 
 def main():
     """Main entry point for VM extraction."""

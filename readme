@@ -64,3 +64,8 @@ This repository works with the [Ethereum Extraction Orchestrator](https://github
 - Configuration generation for each VM
 - Result collection and aggregation
 - Resource cleanup
+
+
+## Metrics
+
+Execution per interval varies dependant on network deployment, allocated resources, and traffic factors. However, a typical hour-long interval is processed in about **60-90 seconds**.
