@@ -115,38 +115,49 @@ class EthereumExtractor:
         # Only log status changes to file, not console
         pass
         
-    def _make_eth_request(self, method: str, params: List = None) -> Optional[Dict]:
-        """Make JSON-RPC request to Ethereum provider."""
+    def _make_eth_request(self, method: str, params: List = None, retries: int = 3) -> Optional[Dict]:
+        """Make JSON-RPC request to Ethereum provider with retry logic."""
         if params is None:
             params = []
-            
+
         payload = {
             "jsonrpc": "2.0",
             "method": method,
             "params": params,
             "id": 1
         }
-        
-        try:
-            response = requests.post(
-                self.provider_url,
-                json=payload,
-                headers={'Content-Type': 'application/json'},
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                if 'result' in result:
-                    return result['result']
+
+        for attempt in range(retries):
+            try:
+                response = requests.post(
+                    self.provider_url,
+                    json=payload,
+                    headers={'Content-Type': 'application/json'},
+                    timeout=30
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'result' in result:
+                        return result['result']
+                    else:
+                        self.logger.error(f"RPC error: {result.get('error', 'Unknown error')}")
+                elif response.status_code == 503:
+                    self.logger.error(f"503 Service Unavailable (attempt {attempt + 1}/{retries}): {response.text}")
+                    if attempt < retries - 1:
+                        time.sleep(2 ** attempt)
+                        continue
                 else:
-                    self.logger.error(f"RPC error: {result.get('error', 'Unknown error')}")
-            else:
-                self.logger.error(f"HTTP error {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.logger.error(f"Request failed: {e}")
-            
+                    self.logger.error(f"HTTP error {response.status_code}: {response.text}")
+
+            except requests.Timeout:
+                self.logger.error(f"Request timeout (attempt {attempt + 1}/{retries})")
+                if attempt < retries - 1:
+                    time.sleep(2 ** attempt)
+                    continue
+            except Exception as e:
+                self.logger.error(f"Request failed: {e}")
+
         return None
         
     def _get_block_by_number(self, block_number: int, full_transactions: bool = True) -> Optional[Dict]:
