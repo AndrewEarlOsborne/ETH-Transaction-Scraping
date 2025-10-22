@@ -388,11 +388,17 @@ class EthereumExtractor:
                     completed_intervals = i + 1
                     self._update_status("RUNNING", f"{completed_intervals}/{total_intervals}")
                     
-            
+
             # Final status update
             if self.check_completed(validator_file):
                 self.aggregate_results()
-                self._update_status("COMPLETED", f"{completed_intervals}/{total_intervals}")
+
+                # Validate aggregated results file exists and is not empty
+                aggregated_file = os.path.join(self.data_directory, 'aggregated_results.csv')
+                if os.path.exists(aggregated_file) and os.path.getsize(aggregated_file) > 0:
+                    self._update_status("COMPLETED", f"{completed_intervals}/{total_intervals}")
+                else:
+                    self._update_status("ERROR", "Aggregated results file missing or empty")
             else:
                 self._update_status("FAILED", "Incomplete extraction")
             print(f"\nExtracted {total_transactions:,} transactions and {total_validators:,} validator records")
@@ -479,7 +485,7 @@ class EthereumExtractor:
                 validator_results,
                 how='inner',
                 on=['interval_start', 'interval_end']
-            )
+            ).fillna(0)
 
             # Save aggregated results
             output_file = os.path.join(self.data_directory, 'aggregated_results.csv')
